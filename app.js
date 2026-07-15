@@ -1,110 +1,146 @@
-JavaScript
 // 1. Configuração do Cenário 3D
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xf1f2f6);
 
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-camera.position.set(3.5, 2, 4.5); // Câmera ajustada para ver a diagonal externa
+camera.position.set(2.0, 1.5, 3.0);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
-// Controles de câmera (Rotação e Zoom)
 const controls = new THREE.OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 
 // Luzes
-const light1 = new THREE.DirectionalLight(0xffffff, 1.5); // Luz mais forte para detalhes externos
-light1.position.set(5, 15, 10);
+const light1 = new THREE.DirectionalLight(0xffffff, 1.2);
+light1.position.set(5, 10, 7);
 scene.add(light1);
-const light2 = new THREE.AmbientLight(0xffffff, 0.7);
+const light2 = new THREE.AmbientLight(0xffffff, 0.6);
 scene.add(light2);
 
-// Grid de referência
+// Chão
 const grid = new THREE.GridHelper(10, 20, 0x7f8c8d, 0xbdc3c7);
-grid.position.y = -0.6;
+grid.position.y = -1.0;
 scene.add(grid);
 
-// Materiais (Aço Galvanizado e Platibanda)
-const materialAco = new THREE.MeshStandardMaterial({ color: 0x8e8e8e, roughness: 0.3, metalness: 0.9 });
-const materialConcreto = new THREE.MeshLambertMaterial({ color: 0xa8a8a8 });
+const materialAco = new THREE.MeshStandardMaterial({ color: 0x7f8c8d, roughness: 0.4, metalness: 0.8 });
+const materialConcreto = new THREE.MeshLambertMaterial({ color: 0x95a5a6 });
 
-// Grupos
-const grupoSuporteL = new THREE.Group();
-const grupoApertoV = new THREE.Group();
-scene.add(grupoSuporteL);
-scene.add(grupoApertoV);
+const grupoMastroHorizontal = new THREE.Group();
+const grupoVRegulagemHorizontal = new THREE.Group();
+scene.add(grupoMastroHorizontal);
+scene.add(grupoVRegulagemHorizontal);
 
 let platibandaMesh;
 
+// 2. Função de Renderização e Cálculos
 function atualizarModelo() {
-    // Limpa os desenhos anteriores
-    while(grupoSuporteL.children.length > 0) grupoSuporteL.remove(grupoSuporteL.children[0]);
-    while(grupoApertoV.children.length > 0) grupoApertoV.remove(grupoApertoV.children[0]);
+    while(grupoMastroHorizontal.children.length > 0) grupoMastroHorizontal.remove(grupoMastroHorizontal.children[0]);
+    while(grupoVRegulagemHorizontal.children.length > 0) grupoVRegulagemHorizontal.remove(grupoVRegulagemHorizontal.children[0]);
     if (platibandaMesh) scene.remove(platibandaMesh);
 
-    // Valores reais do projeto (em metros)
-    const compL = 2.193; // 2193mm
-    const altL = 0.535;  // 535mm
-    const largPlatibanda = parseFloat(document.getElementById('larguraPlatibanda').value) / 100; 
+    // Lendo os inputs das dimensões
+    const compMastro = parseFloat(document.getElementById('compMastro').value) || 0;
+    const altExt = parseFloat(document.getElementById('altExt').value) || 0;
+    const altInt = parseFloat(document.getElementById('altInt').value) || 0;
+    const compDiag = parseFloat(document.getElementById('compDiag').value) || 0;
 
-    // --- 1. SUPORTE EM L (FIXO E EXTERNO) ---
-    // Braço Horizontal de Projeção (2.193m)
-    const geomHoriz = new THREE.BoxGeometry(compL, 0.06, 0.06);
-    const meshHoriz = new THREE.Mesh(geomHoriz, materialAco);
-    meshHoriz.position.set(compL / 2 - 0.2, altL, 0); 
-    grupoSuporteL.add(meshHoriz);
+    const bitolaMastro = (parseFloat(document.getElementById('bitolaMastro').value) || 0) / 1000;
+    const bitolaExt = (parseFloat(document.getElementById('bitolaExt').value) || 0) / 1000;
+    const bitolaInt = (parseFloat(document.getElementById('bitolaInt').value) || 0) / 1000;
+    const bitolaDiag = (parseFloat(document.getElementById('bitolaDiag').value) || 0) / 1000;
 
-    // Coluna Vertical Externa (535mm) - Fica FORA do prédio
-    const geomVertExt = new THREE.BoxGeometry(0.06, altL, 0.06);
+    // Ajuste da platibanda vindo do slider (convertendo cm para metros)
+    const largPlatibanda = (parseFloat(document.getElementById('larguraPlatibanda').value) || 0) / 100;
+    
+    // Quantidade de peças
+    const qtdSuportes = parseInt(document.getElementById('qtdSuportes').value) || 1;
+
+    // --- MONTAGEM DO MODELO 3D INVERTIDO ---
+    // 1. Mastro Horizontal Fixo
+    const geomMastro = new THREE.BoxGeometry(compMastro, bitolaMastro, bitolaMastro);
+    const meshMastro = new THREE.Mesh(geomMastro, materialAco);
+    meshMastro.position.set(compMastro / 2 - 0.3, altExt, 0); 
+    grupoMastroHorizontal.add(meshMastro);
+
+    // 2. Coluna Fixa (Direita)
+    const geomVertExt = new THREE.BoxGeometry(bitolaExt, altExt, bitolaExt);
     const meshVertExt = new THREE.Mesh(geomVertExt, materialAco);
-    meshVertExt.position.set(-0.2, altL / 2, 0);
-    grupoSuporteL.add(meshVertExt);
+    const posColFixaX = -0.3 + largPlatibanda + bitolaExt/2;
+    meshVertExt.position.set(posColFixaX, altExt / 2, 0);
+    grupoMastroHorizontal.add(meshVertExt);
 
-    // Mão Francesa / Diagonal (902mm) - AGORA ESTÁ EXTERNA
-    const geomDiag = new THREE.BoxGeometry(0.06, 0.902, 0.06);
-    const meshDiag = new THREE.Mesh(geomDiag, materialAco);
-    meshDiag.rotation.z = -Math.PI / 3.33; // Inclinação oposta (~ -54°) para apontar para fora
-    // Posição ajustada para conectar o braço horizontal ao tubo de 45cm externo
-    meshDiag.position.set(-0.6, altL / 2 + 0.1, 0); 
-    grupoSuporteL.add(meshDiag);
-
-    // --- 2. PLATIBANDA (MURETA) ---
-    const geomPlat = new THREE.BoxGeometry(largPlatibanda, altL, 0.8);
+    // 3. Mureta Platibanda
+    const geomPlat = new THREE.BoxGeometry(largPlatibanda, altExt, 0.6);
     platibandaMesh = new THREE.Mesh(geomPlat, materialConcreto);
-    // Platibanda posicionada entre a coluna externa fixa e o V móvel
-    platibandaMesh.position.set(-0.2 + 0.03 + largPlatibanda / 2, altL / 2, 0);
+    platibandaMesh.position.set(posColFixaX - bitolaExt/2 - largPlatibanda/2, altExt / 2, 0);
     scene.add(platibandaMesh);
 
-    // --- 3. CONJUNTO DE REGULAGEM EM V (MÓVEL E INTERNO) ---
-    // Braço Vertical Interno (535mm) - Funciona como a garra interna
-    const geomVertInt = new THREE.BoxGeometry(0.06, altL, 0.06);
+    // 4. Conjunto Regulagem Móvel (Esquerda)
+    const geomVertInt = new THREE.BoxGeometry(bitolaInt, altInt, bitolaInt);
     const meshVertInt = new THREE.Mesh(geomVertInt, materialAco);
-    meshVertInt.position.set(0, -altL / 2, 0);
-    grupoApertoV.add(meshVertInt);
+    meshVertInt.position.set(0, -altInt / 2, 0); 
+    grupoVRegulagemHorizontal.add(meshVertInt);
 
-    // Luva Superior que desliza no braço de 2.193m
-    const geomLuvaSup = new THREE.BoxGeometry(0.12, 0.07, 0.07); // Luva ligeiramente maior
-    const meshLuvaSup = new THREE.Mesh(geomLuvaSup, materialAco);
-    meshLuvaSup.position.set(-0.06, 0, 0);
-    grupoApertoV.add(meshLuvaSup);
+    // Luvas mecânicas fictícias de encaixe
+    const geomLuvaEsq = new THREE.BoxGeometry(0.12, bitolaMastro + 0.015, bitolaMastro + 0.015);
+    const meshLuvaEsq = new THREE.Mesh(geomLuvaEsq, materialAco);
+    meshLuvaEsq.position.set(0, 0, 0);
+    grupoVRegulagemHorizontal.add(meshLuvaEsq);
 
-    // POSICIONAMENTO DINÂMICO DO "V" (SARGENTO INTERNO):
-    // Move o conjunto de garra interna para trás/frente de acordo com a platibanda
-    grupoApertoV.position.set(-0.2 + 0.06 + largPlatibanda + 0.03, altL, 0);
+    const distHorizontalDiag = compDiag * 0.707; 
+    const geomDiag = new THREE.BoxGeometry(bitolaDiag, compDiag, bitolaDiag);
+    const meshDiag = new THREE.Mesh(geomDiag, materialAco);
+    meshDiag.rotation.z = Math.PI / 4; 
+    meshDiag.position.set(-distHorizontalDiag / 2, -distHorizontalDiag / 2, 0);
+    grupoVRegulagemHorizontal.add(meshDiag);
+
+    const geomLuvaDir = new THREE.BoxGeometry(0.12, bitolaMastro + 0.015, bitolaMastro + 0.015);
+    const meshLuvaDir = new THREE.Mesh(geomLuvaDir, materialAco);
+    meshLuvaDir.position.set(-distHorizontalDiag, 0, 0);
+    grupoVRegulagemHorizontal.add(meshLuvaDir);
+
+    const posXRegulagem = posColFixaX - bitolaExt/2 - largPlatibanda - bitolaInt/2;
+    grupoVRegulagemHorizontal.position.set(posXRegulagem, altExt, 0);
+
+    // --- SEÇÃO DE CÁLCULO DE MATERIAIS ---
+    const metros1SuporteTubos = compMastro + altExt + altInt;
+    const metros1SuporteDiag = compDiag;
+
+    const totalMetrosTubosPedido = metros1SuporteTubos * qtdSuportes;
+    const totalMetrosDiagPedido = metros1SuporteDiag * qtdSuportes;
+    const totalGeralMetros = totalMetrosTubosPedido + totalMetrosDiagPedido;
+
+    // Transforma a metragem linear em barras comerciais de 6 metros
+    const totalBarras = Math.ceil(totalGeralMetros / 6);
+
+    // Atualiza dinamicamente a interface gráfica
+    document.getElementById('totalTubos').innerText = metros1SuporteTubos.toFixed(2) + " m";
+    document.getElementById('totalTubosQtd').innerText = totalMetrosTubosPedido.toFixed(2) + " m";
+    
+    document.getElementById('totalDiag').innerText = metros1SuporteDiag.toFixed(2) + " m";
+    document.getElementById('totalDiagQtd').innerText = totalMetrosDiagPedido.toFixed(2) + " m";
+    
+    document.getElementById('totalGeral').innerText = totalGeralMetros.toFixed(2) + " m";
+    document.getElementById('totalBarras').innerText = totalBarras + " barras (de 6m)";
 }
 
-// Evento do Slider
+// 3. Monitores de Input
+const listaInputs = ['compMastro', 'bitolaMastro', 'altExt', 'bitolaExt', 'altInt', 'bitolaInt', 'compDiag', 'bitolaDiag', 'qtdSuportes'];
+listaInputs.forEach(id => {
+    document.getElementById(id).addEventListener('input', atualizarModelo);
+});
+
 document.getElementById('larguraPlatibanda').addEventListener('input', (e) => {
     document.getElementById('lblPlatibanda').innerText = e.target.value + " cm";
     atualizarModelo();
 });
 
-// Inicialização
+// Inicialização primária
 atualizarModelo();
 
-// Loop de animação
+// Loop de renderização 3D
 function animate() {
     requestAnimationFrame(animate);
     controls.update();
